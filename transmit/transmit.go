@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 	"time"
-
+	"fmt"
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/honeycombio/refinery/logger"
 	"github.com/honeycombio/refinery/metrics"
 	"github.com/honeycombio/refinery/types"
+	"github.com/honeycombio/refinery/buffer"
 )
 
 type Transmission interface {
@@ -37,6 +38,11 @@ type DefaultTransmission struct {
 	Version    string          `inject:"version"`
 	LibhClient *libhoney.Client
 
+	failedEventsBuffer *buffer.RingBuffer
+    eventStore         map[int64]*types.Event
+    eventStoreLock     sync.Mutex
+
+
 	// Type is peer or upstream, and used only for naming metrics
 	Name string
 
@@ -47,7 +53,7 @@ type DefaultTransmission struct {
 var once sync.Once
 
 func NewDefaultTransmission(client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
-	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name}
+	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event)}
 }
 
 func (d *DefaultTransmission) Start() error {
@@ -113,7 +119,9 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 		"environment": ev.Environment,
 		"enqueued_at": time.Now().UnixMicro(),
 	}
-
+    d.eventStoreLock.Lock()
+	d.eventStore[metadata["enqueued_at"].(int64)] = ev
+	d.eventStoreLock.Unlock()
 	for _, k := range d.Config.GetAdditionalErrorFields() {
 		if v, ok := ev.Data[k]; ok {
 			metadata[k] = v
@@ -124,6 +132,7 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 	for k, v := range ev.Data {
 		libhEv.AddField(k, v)
 	}
+
 
 	err := libhEv.SendPresampled()
 	if err != nil {
@@ -175,6 +184,12 @@ func (d *DefaultTransmission) processResponses(
 					enqueuedAt = metadata["enqueued_at"].(int64)
 					dequeuedAt = time.Now().UnixMicro()
 				}
+				d.eventStoreLock.Lock()
+				if event, exists := d.eventStore[enqueuedAt]; exists {
+					d.failedEventsBuffer.Push(event)
+					delete(d.eventStore, enqueuedAt)
+				}
+				d.eventStoreLock.Unlock()
 				log := d.Logger.Error().WithFields(map[string]interface{}{
 					"status_code":    r.StatusCode,
 					"api_host":       apiHost,
@@ -197,6 +212,9 @@ func (d *DefaultTransmission) processResponses(
 					enqueuedAt = metadata["enqueued_at"].(int64)
 					dequeuedAt = time.Now().UnixMicro()
 				}
+				d.eventStoreLock.Lock()
+				delete(d.eventStore, enqueuedAt)
+				d.eventStoreLock.Unlock()
 				d.Metrics.Increment(counterResponse20x)
 			}
 			d.Metrics.Down(updownQueuedItems)
