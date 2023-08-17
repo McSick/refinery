@@ -3,10 +3,23 @@ package buffer
 import (
 	"sync"
 	"github.com/honeycombio/refinery/types"
+	"fmt"
+	"time"
+	"strings"
 )
+type EventMetadata struct {
+    RetryCount    int
+    NextRetryTime time.Duration
+}
+
+type ExtendedEvent struct {
+    *types.Event
+    Metadata EventMetadata
+}
+
 
 type RingBuffer struct {
-    mu    sync.Mutex
+    mu    sync.RWMutex
     size  int
     data  []*types.Event
     start int // points to the oldest element
@@ -41,3 +54,16 @@ func (rb *RingBuffer) GetAll() []*types.Event {
     return append(rb.data[rb.start:], rb.data[:rb.end]...)
 }
 
+func (rb *RingBuffer) String() string {
+	rb.mu.RLock()
+	defer rb.mu.RUnlock()
+
+	var bufferContents []string
+	for _, item := range rb.data {
+		if item != nil {
+			bufferContents = append(bufferContents, fmt.Sprintf("%v", item))
+		}
+	}
+
+	return fmt.Sprintf("RingBuffer Contents: [%s]", strings.Join(bufferContents, ", "))
+}

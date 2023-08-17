@@ -4,7 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
-	"fmt"
+	// "fmt"
+	// "strings"
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
@@ -132,6 +133,10 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 	for k, v := range ev.Data {
 		libhEv.AddField(k, v)
 	}
+	// TODO REMOVE AFTER TESTING
+	// largeString := strings.Repeat("A", 101*1024) // This creates a string slightly over 64KB
+    // libhEv.AddField("oversized_field", largeString)
+
 
 
 	err := libhEv.SendPresampled()
@@ -190,6 +195,9 @@ func (d *DefaultTransmission) processResponses(
 					delete(d.eventStore, enqueuedAt)
 				}
 				d.eventStoreLock.Unlock()
+				// TODO remove after testing
+				//fmt.Println(d.failedEventsBuffer) // It will invoke the String method automatically
+
 				log := d.Logger.Error().WithFields(map[string]interface{}{
 					"status_code":    r.StatusCode,
 					"api_host":       apiHost,
