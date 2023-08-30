@@ -1,11 +1,10 @@
 package transmit
 
 import (
+	"fmt"
 	"context"
 	"sync"
 	"time"
-	// "fmt"
-	// "strings"
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/honeycombio/refinery/metrics"
 	"github.com/honeycombio/refinery/types"
 	"github.com/honeycombio/refinery/buffer"
+	"github.com/honeycombio/refinery/backup"
+
 )
 
 type Transmission interface {
@@ -43,6 +44,7 @@ type DefaultTransmission struct {
     eventStore         map[int64]*types.Event
     eventStoreLock     sync.Mutex
 
+	Backup backup.Backup
 
 	// Type is peer or upstream, and used only for naming metrics
 	Name string
@@ -54,7 +56,7 @@ type DefaultTransmission struct {
 var once sync.Once
 
 func NewDefaultTransmission(client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
-	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event)}
+	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewDiskBackup("./failedevents")}
 }
 
 func (d *DefaultTransmission) Start() error {
@@ -101,6 +103,12 @@ func (d *DefaultTransmission) reloadTransmissionBuilder() {
 	builder.APIHost = upstreamAPI
 }
 
+// func (d *DefaultTransmission) addToEventStore(ev *types.Event, enqueued_at string) map[string]any {
+// 	d.eventStoreLock.Lock()
+// 	d.eventStore[enqueued_at.(int64)] = ev
+// 	d.eventStoreLock.Unlock()
+// }
+
 func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 	d.Logger.Debug().
 		WithField("request_id", ev.Context.Value(types.RequestIDContextKey{})).
@@ -141,6 +149,7 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 
 	err := libhEv.SendPresampled()
 	if err != nil {
+		d.Backup.Save(ev) // FIXME Why is there multiple failure spots?
 		d.Metrics.Increment(counterEnqueueErrors)
 		d.Logger.Error().
 			WithString("error", err.Error()).
@@ -172,6 +181,27 @@ func (d *DefaultTransmission) Stop() error {
 	return nil
 }
 
+// TODO REtry mechanism
+// const MAX_RETRIES = 3;
+// func (d *DefaultTransmission) RetryFailedEvents() {
+//     for _, extEvent := range d.failedEventsBuffer.GetAll() {
+//         if extEvent.Metadata.RetryCount < MAX_RETRIES { 
+//             // Adjust MAX_RETRIES as per your requirement
+//             d.EnqueueEvent(extEvent.Event)
+//             extEvent.Metadata.RetryCount++
+//             time.Sleep(extEvent.Metadata.NextRetryTime)
+//             extEvent.Metadata.NextRetryTime *= 2 // Exponential backoff
+//         } else {
+// 			err := d.Backup.Save(event)
+// 			if err != nil {
+// 				// Handle error (logging, metrics, etc.)
+// 			}
+//         }
+//     }
+//     // Clear the buffer after retrying
+//     d.failedEventsBuffer = buffer.NewRingBuffer(1000)
+// }
+
 func (d *DefaultTransmission) processResponses(
 	ctx context.Context,
 	responses chan transmission.Response,
@@ -191,12 +221,18 @@ func (d *DefaultTransmission) processResponses(
 				}
 				d.eventStoreLock.Lock()
 				if event, exists := d.eventStore[enqueuedAt]; exists {
+									// TODO remove after testing
+					//fmt.Println(event) // It will invoke the String method automatically
 					d.failedEventsBuffer.Push(event)
+					saveerror := d.Backup.Save(event)
+					if  saveerror != nil {
+						fmt.Println(saveerror)
+					} // FIXME this is just for testing, remove it later
 					delete(d.eventStore, enqueuedAt)
 				}
 				d.eventStoreLock.Unlock()
-				// TODO remove after testing
-				//fmt.Println(d.failedEventsBuffer) // It will invoke the String method automatically
+
+
 
 				log := d.Logger.Error().WithFields(map[string]interface{}{
 					"status_code":    r.StatusCode,
