@@ -56,7 +56,8 @@ type DefaultTransmission struct {
 var once sync.Once
 
 func NewDefaultTransmission(client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
-	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewDiskBackup("./failedevents")}
+	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewS3Backup("durable-refinery")}
+//	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewDiskBackup("./failedevents")}
 }
 
 func (d *DefaultTransmission) Start() error {
