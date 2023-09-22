@@ -211,6 +211,25 @@ type configContents struct {
 	GRPCServerParameters GRPCServerParameters      `yaml:"GRPCServerParameters"`
 	SampleCache          SampleCacheConfig         `yaml:"SampleCache"`
 	StressRelief         StressReliefConfig        `yaml:"StressRelief"`
+	Backup               BackupConfig              `yaml:"Backup"`
+	DiskBackup           DiskBackupConfig          `yaml:"DiskBackup"`
+	S3Backup             S3BackupConfig            `yaml:"S3Backup"`
+}
+type BackupConfig struct {
+	Type             string           `yaml:"Type" default:"none"`
+	MaxBufferSize    int              `yaml:"MaxBufferSize" default:"1000"`
+	FlushInterval    Duration         `yaml:"FlushInterval" default:"30s"`
+	DiskBackupConfig DiskBackupConfig `yaml:"DiskBackupConfig"`
+	S3BackupConfig   S3BackupConfig   `yaml:"S3BackupConfig"`
+}
+type DiskBackupConfig struct {
+	Dir string `yaml:"Dir" default:"/tmp/refinery-backup"`
+}
+type S3BackupConfig struct {
+	Bucket                string `yaml:"Bucket" default:"refinery-backup"`
+	AWS_ACCESS_KEY_ID     string `yaml:"AWS_ACCESS_KEY_ID" default:""`
+	AWS_SECRET_ACCESS_KEY string `yaml:"AWS_SECRET_ACCESS_KEY" default:""`
+	AWS_REGION            string `yaml:"AWS_REGION" default:"us-east-1"`
 }
 
 type GeneralConfig struct {
@@ -1008,4 +1027,60 @@ func (f *fileConfig) GetAdditionalAttributes() map[string]string {
 	defer f.mux.RUnlock()
 
 	return f.mainConfig.Specialized.AdditionalAttributes
+}
+
+func (f *fileConfig) GetBackupType() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.Backup.Type
+}
+
+func (f *fileConfig) GetBackupMaxBufferSize() int {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.Backup.MaxBufferSize
+}
+
+func (f *fileConfig) GetBackupFlushInterval() time.Duration {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return time.Duration(f.mainConfig.Backup.FlushInterval)
+}
+
+func (f *fileConfig) GetBackupDir() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.DiskBackup.Dir
+}
+
+func (f *fileConfig) GetBackupBucket() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.S3Backup.Bucket
+}
+
+func (f *fileConfig) GetBackupAWSAccessKeyID() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.S3Backup.AWS_ACCESS_KEY_ID
+}
+
+func (f *fileConfig) GetBackupAWSSecretAccessKey() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.S3Backup.AWS_SECRET_ACCESS_KEY
+}
+
+func (f *fileConfig) GetBackupAWSRegion() string {
+	f.mux.RLock()
+	defer f.mux.RUnlock()
+
+	return f.mainConfig.S3Backup.AWS_REGION
 }

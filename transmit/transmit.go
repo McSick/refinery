@@ -1,20 +1,19 @@
 package transmit
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 	"sync"
 	"time"
+
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
+	"github.com/honeycombio/refinery/backup"
 	"github.com/honeycombio/refinery/config"
 	"github.com/honeycombio/refinery/logger"
 	"github.com/honeycombio/refinery/metrics"
 	"github.com/honeycombio/refinery/types"
-	"github.com/honeycombio/refinery/buffer"
-	"github.com/honeycombio/refinery/backup"
-
 )
 
 type Transmission interface {
@@ -40,9 +39,8 @@ type DefaultTransmission struct {
 	Version    string          `inject:"version"`
 	LibhClient *libhoney.Client
 
-	failedEventsBuffer *buffer.RingBuffer
-    eventStore         map[int64]*types.Event
-    eventStoreLock     sync.Mutex
+	eventStore     map[int64]*types.Event
+	eventStoreLock sync.Mutex
 
 	Backup backup.Backup
 
@@ -55,9 +53,8 @@ type DefaultTransmission struct {
 
 var once sync.Once
 
-func NewDefaultTransmission(client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
-	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewS3Backup("durable-refinery")}
-//	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, failedEventsBuffer: buffer.NewRingBuffer(1000), eventStore: make(map[int64]*types.Event), Backup: backup.NewDiskBackup("./failedevents")}
+func NewDefaultTransmission(c config.Config, client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
+	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, eventStore: make(map[int64]*types.Event), Backup: backup.NewBackup(c)}
 }
 
 func (d *DefaultTransmission) Start() error {
@@ -129,7 +126,7 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 		"environment": ev.Environment,
 		"enqueued_at": time.Now().UnixMicro(),
 	}
-    d.eventStoreLock.Lock()
+	d.eventStoreLock.Lock()
 	d.eventStore[metadata["enqueued_at"].(int64)] = ev
 	d.eventStoreLock.Unlock()
 	for _, k := range d.Config.GetAdditionalErrorFields() {
@@ -142,11 +139,6 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 	for k, v := range ev.Data {
 		libhEv.AddField(k, v)
 	}
-	// TODO REMOVE AFTER TESTING
-	// largeString := strings.Repeat("A", 101*1024) // This creates a string slightly over 64KB
-    // libhEv.AddField("oversized_field", largeString)
-
-
 
 	err := libhEv.SendPresampled()
 	if err != nil {
@@ -182,27 +174,6 @@ func (d *DefaultTransmission) Stop() error {
 	return nil
 }
 
-// TODO REtry mechanism
-// const MAX_RETRIES = 3;
-// func (d *DefaultTransmission) RetryFailedEvents() {
-//     for _, extEvent := range d.failedEventsBuffer.GetAll() {
-//         if extEvent.Metadata.RetryCount < MAX_RETRIES { 
-//             // Adjust MAX_RETRIES as per your requirement
-//             d.EnqueueEvent(extEvent.Event)
-//             extEvent.Metadata.RetryCount++
-//             time.Sleep(extEvent.Metadata.NextRetryTime)
-//             extEvent.Metadata.NextRetryTime *= 2 // Exponential backoff
-//         } else {
-// 			err := d.Backup.Save(event)
-// 			if err != nil {
-// 				// Handle error (logging, metrics, etc.)
-// 			}
-//         }
-//     }
-//     // Clear the buffer after retrying
-//     d.failedEventsBuffer = buffer.NewRingBuffer(1000)
-// }
-
 func (d *DefaultTransmission) processResponses(
 	ctx context.Context,
 	responses chan transmission.Response,
@@ -220,20 +191,13 @@ func (d *DefaultTransmission) processResponses(
 					enqueuedAt = metadata["enqueued_at"].(int64)
 					dequeuedAt = time.Now().UnixMicro()
 				}
-				d.eventStoreLock.Lock()
+
 				if event, exists := d.eventStore[enqueuedAt]; exists {
-									// TODO remove after testing
-					//fmt.Println(event) // It will invoke the String method automatically
-					d.failedEventsBuffer.Push(event)
 					saveerror := d.Backup.Save(event)
-					if  saveerror != nil {
+					if saveerror != nil {
 						fmt.Println(saveerror)
 					} // FIXME this is just for testing, remove it later
-					delete(d.eventStore, enqueuedAt)
 				}
-				d.eventStoreLock.Unlock()
-
-
 
 				log := d.Logger.Error().WithFields(map[string]interface{}{
 					"status_code":    r.StatusCode,

@@ -12,20 +12,22 @@ import (
 
 type DiskBackup struct {
 	Dir       string
-	events    []*types.Event
+	events    []*types.SaveAbleEvent
 	lastSaved time.Time
+    FlushInterval time.Duration
+    MaxBufferSize int
 }
 
-func NewDiskBackup(dir string) *DiskBackup {
-	db := &DiskBackup{Dir: dir, lastSaved: time.Now()}
+func NewDiskBackup(dir string, flushinterval time.Duration, maxbuffersize int) *DiskBackup {
+	db := &DiskBackup{Dir: dir, lastSaved: time.Now(), FlushInterval: flushinterval, MaxBufferSize: maxbuffersize}
 	go db.PeriodicFlush()
 	return db
 }
 
 func (d *DiskBackup) Save(event *types.Event) error {
-	d.events = append(d.events, event)
+	d.events = append(d.events, event.ConvertToSaveAbleEvent())
 
-	if len(d.events) >= MaxBufferSize {
+	if len(d.events) >= d.MaxBufferSize {
 		return d.flushEventsToFile()
 	}
 
@@ -34,9 +36,9 @@ func (d *DiskBackup) Save(event *types.Event) error {
 
 func (d *DiskBackup) PeriodicFlush() {
 	for {
-		time.Sleep(FlushInterval)
+		time.Sleep(d.FlushInterval)
 
-		if len(d.events) > 0 && time.Since(d.lastSaved) >= FlushInterval {
+		if len(d.events) > 0 && time.Since(d.lastSaved) >= d.FlushInterval {
 			d.flushEventsToFile()
 		}
 	}

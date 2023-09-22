@@ -30,6 +30,29 @@ type Event struct {
 	Data        map[string]interface{}
 }
 
+// For JSON serializing to disk, dont need context
+type SaveAbleEvent struct {
+	APIHost     string
+	APIKey      string
+	Dataset     string
+	Environment string
+	SampleRate  uint
+	Timestamp   time.Time
+	Data        map[string]interface{}
+}
+
+func (e *Event) ConvertToSaveAbleEvent() *SaveAbleEvent {
+    return &SaveAbleEvent{
+        APIHost:     e.APIHost,
+        APIKey:      e.APIKey,
+        Dataset:     e.Dataset,
+        Environment: e.Environment,
+        SampleRate:  e.SampleRate,
+        Timestamp:   e.Timestamp,
+        Data:        e.Data,
+    }
+}
+
 // Trace isn't something that shows up on the wire; it gets created within
 // Refinery. Traces are not thread-safe; only one goroutine should be working
 // with a trace object at a time.
