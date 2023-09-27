@@ -1,13 +1,13 @@
 package backup
 
 import (
-	"io/ioutil"
-	"path/filepath"
+	"context"
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
-	"encoding/json"
-	"context"
+
 	"github.com/honeycombio/refinery/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,7 @@ import (
 func TestDiskBackup(t *testing.T) {
 
 	t.Run("CreateDiskBackup", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "backup")
+		dir, err := os.MkdirTemp("", "backup")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -25,7 +25,7 @@ func TestDiskBackup(t *testing.T) {
 	})
 
 	t.Run("SaveEventFlush", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "backup")
+		dir, err := os.MkdirTemp("", "backup")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -36,13 +36,13 @@ func TestDiskBackup(t *testing.T) {
 			db.Save(&types.Event{})
 		}
 		// Check if a file exists in the directory after buffer is filled.
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(files))
 	})
 
 	t.Run("PeriodicFlush", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "backup")
+		dir, err := os.MkdirTemp("", "backup")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,13 +52,13 @@ func TestDiskBackup(t *testing.T) {
 		db.Save(&types.Event{})
 		// Wait for a time greater than the FlushInterval
 		time.Sleep(db.FlushInterval + time.Second)
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(files))
 	})
 
 	t.Run("EventSerialization", func(t *testing.T) {
-		dir, err := ioutil.TempDir("", "backup")
+		dir, err := os.MkdirTemp("", "backup")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,11 +81,11 @@ func TestDiskBackup(t *testing.T) {
 		db.Save(event)
 		db.flushEventsToFile()
 
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, files)
 
-		data, err := ioutil.ReadFile(filepath.Join(dir, files[0].Name()))
+		data, err := os.ReadFile(filepath.Join(dir, files[0].Name()))
 		assert.NoError(t, err)
 
 		var loadedEvents []*types.SaveAbleEvent

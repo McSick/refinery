@@ -216,11 +216,9 @@ type configContents struct {
 	S3Backup             S3BackupConfig            `yaml:"S3Backup"`
 }
 type BackupConfig struct {
-	Type             string           `yaml:"Type" default:"none"`
-	MaxBufferSize    int              `yaml:"MaxBufferSize" default:"1000"`
-	FlushInterval    Duration         `yaml:"FlushInterval" default:"30s"`
-	DiskBackupConfig DiskBackupConfig `yaml:"DiskBackupConfig"`
-	S3BackupConfig   S3BackupConfig   `yaml:"S3BackupConfig"`
+	Type          string   `yaml:"Type" default:"none"`
+	MaxBufferSize int      `yaml:"MaxBufferSize" default:"10000"`
+	FlushInterval Duration `yaml:"FlushInterval" default:"30s"`
 }
 type DiskBackupConfig struct {
 	Dir string `yaml:"Dir" default:"/tmp/refinery-backup"`

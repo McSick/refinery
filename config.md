@@ -1,7 +1,7 @@
 # Honeycomb Refinery Configuration Documentation
 
 This is the documentation for the configuration file for Honeycomb's Refinery.
-It was automatically generated on 2023-08-02 at 23:32:04 UTC.
+It was automatically generated on 2023-09-27 at 17:44:01 UTC.
 
 ## The Config file
 
@@ -46,6 +46,9 @@ The remainder of this document describes the sections within the file and the fi
 - [gRPC Server Parameters](#grpc-server-parameters)
 - [Sample Cache](#sample-cache)
 - [Stress Relief](#stress-relief)
+- [Bacup Configuration](#bacup-configuration)
+- [DiskBackup Configuration](#diskbackup-configuration)
+- [S3 Backup Configuration](#s3-backup-configuration)
 ## General Configuration
 
 `General` contains general configuration options that apply to the entire Refinery process.
@@ -1079,4 +1082,94 @@ If this duration is `0`, then Refinery will not start in stressed mode, which wi
 - Eligible for live reload.
 - Type: `duration`
 - Default: `3s`
+
+## Bacup Configuration
+
+`Backup` contains backup configuration options.
+### `Type`
+
+Type which type of backup to use
+
+This setting is the type of backup to use.
+Valid values are "none", "s3", or "disk" Depending on the type chosen, there may be  extra config options
+
+- Not eligible for live reload.
+- Type: `string`
+- Default: `none`
+
+### `MaxBufferSize`
+
+MaxBufferSize is the number events to keep before saving failed events.
+
+This is used to batch events together when saving.
+The larger this  number, the bigger the backup file sizes will be.
+Adjust smaller if your events have a larger than average byte size, adjust bigger  for less backup files.
+
+- Eligible for live reload.
+- Type: `int`
+- Default: `10000`
+
+### `FlushInterval`
+
+FlushInterval how often to flush the failed events buffer.
+
+This is used for when there are not enough events in the failed buffer to force a write out.
+This gaurentees that after some amount of time, no matter the size, the events will be saved.
+
+- Not eligible for live reload.
+- Type: `duration`
+- Default: `30s`
+
+## DiskBackup Configuration
+
+`DiskBackup` contains backup configuration options when saving to disk
+### `Dir`
+
+Dir where to save backup files on disk
+
+This is the location of where to save back up files when using the disk backup.
+
+- Not eligible for live reload.
+- Type: `string`
+- Default: `/tmp/refinery-backup`
+
+## S3 Backup Configuration
+
+`S3Backup` contains backup configuration options when saving to AWS S3
+### `Bucket`
+
+Bucket which bucket to save files to on S3
+
+This saves backup files to the specified bucket.
+
+- Not eligible for live reload.
+- Type: `string`
+- Default: `refinery-backup`
+
+### `AWS_ACCESS_KEY_ID`
+
+AWS_ACCESS_KEY_ID Amazon AWS_ACCESS_KEY_ID
+
+The Amazon AWS_ACCESS_KEY_ID with permissions to put objects on the S3 bucket specified.
+
+- Not eligible for live reload.
+- Type: `string`
+
+### `AWS_SECRET_ACCESS_KEY`
+
+AWS_SECRET_ACCESS_KEY Amazon AWS_SECRET_ACCESS_KEY
+
+The Amazon AWS_SECRET_ACCESS_KEY
+
+- Not eligible for live reload.
+- Type: `string`
+
+### `AWS_REGION`
+
+AWS_REGION which AWS region to save to
+
+Which AWS region the back up S3 bucket is located
+- Not eligible for live reload.
+- Type: `string`
+- Default: `us-east-1`
 
