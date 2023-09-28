@@ -200,7 +200,6 @@ type Config interface {
 	GetBackupAWSSecretAccessKey() string
 
 	GetBackupAWSRegion() string
-
 }
 
 type ConfigMetadata struct {
