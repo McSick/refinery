@@ -1,54 +1,60 @@
 package backup
 
 import (
+	"context"
+	"encoding/json"
 	"io"
 	"testing"
 	"time"
-	"context"
-	"encoding/json"
+
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/honeycombio/refinery/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 type mockS3 struct {
 	s3iface.S3API
 	PutObjectInvoked bool
 	LastKey          string
-	LastBody io.ReadSeeker
+	LastBody         io.ReadSeeker
 }
 
 func (m *mockS3) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
 	m.PutObjectInvoked = true
 	m.LastKey = *input.Key
 	m.LastBody = input.Body
-    return &s3.PutObjectOutput{}, nil
+	return &s3.PutObjectOutput{}, nil
 }
 
 func TestS3Backup(t *testing.T) {
 	t.Run("CreateS3Backup", func(t *testing.T) {
 		bucket := "test-bucket"
 		s3Client := &mockS3{}
-		sb := &S3Backup{
-			Bucket:    bucket,
-			S3:        s3Client,
-			lastSaved: time.Now(),
+		sb := &Backup{
+			lastSaved:     time.Now(),
 			FlushInterval: time.Second,
 			MaxBufferSize: 10,
+			backuptype: &S3Backup{
+				Bucket: bucket,
+				S3:     s3Client,
+			},
 		}
+
 		assert.NotNil(t, sb)
 	})
 
 	t.Run("SaveEventFlush", func(t *testing.T) {
 		bucket := "test-bucket"
 		s3Client := &mockS3{}
-		sb := &S3Backup{
-			Bucket:    bucket,
-			S3:        s3Client,
-			lastSaved: time.Now(),
+		sb := &Backup{
+			lastSaved:     time.Now(),
 			FlushInterval: time.Second,
 			MaxBufferSize: 10,
+			backuptype: &S3Backup{
+				Bucket: bucket,
+				S3:     s3Client,
+			},
 		}
 		for i := 0; i < sb.MaxBufferSize; i++ {
 			sb.Save(&types.Event{})
@@ -59,12 +65,14 @@ func TestS3Backup(t *testing.T) {
 	t.Run("PeriodicFlush", func(t *testing.T) {
 		bucket := "test-bucket"
 		s3Client := &mockS3{}
-		sb := &S3Backup{
-			Bucket:    bucket,
-			S3:        s3Client,
-			lastSaved: time.Now(),
+		sb := &Backup{
+			lastSaved:     time.Now(),
 			FlushInterval: time.Second,
 			MaxBufferSize: 10,
+			backuptype: &S3Backup{
+				Bucket: bucket,
+				S3:     s3Client,
+			},
 		}
 		go sb.PeriodicFlush() // Explicitly start the goroutine in the test
 		sb.Save(&types.Event{})
@@ -75,12 +83,14 @@ func TestS3Backup(t *testing.T) {
 	t.Run("EventSerialization", func(t *testing.T) {
 		bucket := "test-bucket"
 		s3Client := &mockS3{}
-		sb := &S3Backup{
-			Bucket:    bucket,
-			S3:        s3Client,
-			lastSaved: time.Now(),
+		sb := &Backup{
+			lastSaved:     time.Now(),
 			FlushInterval: time.Second,
 			MaxBufferSize: 10,
+			backuptype: &S3Backup{
+				Bucket: bucket,
+				S3:     s3Client,
+			},
 		}
 
 		event := &types.Event{
@@ -98,7 +108,7 @@ func TestS3Backup(t *testing.T) {
 		}
 
 		sb.Save(event)
-		sb.flushEventsToS3()
+		sb.backuptype.flush(sb.events)
 
 		// Read the body of the put object input
 		data, readErr := io.ReadAll(s3Client.LastBody)

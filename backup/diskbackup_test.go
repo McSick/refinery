@@ -20,7 +20,14 @@ func TestDiskBackup(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(dir) // Cleanup after the test
-		db := NewDiskBackup(dir, time.Second, 10)
+		db := &Backup{
+			lastSaved:     time.Now(),
+			FlushInterval: time.Second,
+			MaxBufferSize: 10,
+			backuptype: &DiskBackup{
+				Dir: dir,
+			},
+		}
 		assert.NotNil(t, db)
 	})
 
@@ -31,7 +38,14 @@ func TestDiskBackup(t *testing.T) {
 		}
 		defer os.RemoveAll(dir) // Cleanup after the test
 
-		db := NewDiskBackup(dir, time.Second, 10)
+		db := &Backup{
+			lastSaved:     time.Now(),
+			FlushInterval: time.Second,
+			MaxBufferSize: 10,
+			backuptype: &DiskBackup{
+				Dir: dir,
+			},
+		}
 		for i := 0; i < db.MaxBufferSize; i++ {
 			db.Save(&types.Event{})
 		}
@@ -48,7 +62,15 @@ func TestDiskBackup(t *testing.T) {
 		}
 		defer os.RemoveAll(dir) // Cleanup after the test
 
-		db := NewDiskBackup(dir, time.Second, 10)
+		db := &Backup{
+			lastSaved:     time.Now(),
+			FlushInterval: time.Millisecond,
+			MaxBufferSize: 10,
+			backuptype: &DiskBackup{
+				Dir: dir,
+			},
+		}
+		go db.PeriodicFlush()
 		db.Save(&types.Event{})
 		// Wait for a time greater than the FlushInterval
 		time.Sleep(db.FlushInterval + time.Second)
@@ -63,7 +85,14 @@ func TestDiskBackup(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.RemoveAll(dir) // Cleanup after the test
-		db := NewDiskBackup(dir, time.Second, 10)
+		db := &Backup{
+			lastSaved:     time.Now(),
+			FlushInterval: time.Second,
+			MaxBufferSize: 10,
+			backuptype: &DiskBackup{
+				Dir: dir,
+			},
+		}
 		event := &types.Event{
 			Context:     context.Background(),
 			APIHost:     "https://api.honeycomb.io",
@@ -79,7 +108,7 @@ func TestDiskBackup(t *testing.T) {
 		}
 
 		db.Save(event)
-		db.flushEventsToFile()
+		db.backuptype.flush(db.events)
 
 		files, err := os.ReadDir(dir)
 		assert.NoError(t, err)

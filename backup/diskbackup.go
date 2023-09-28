@@ -11,41 +11,11 @@ import (
 )
 
 type DiskBackup struct {
-	Dir       string
-	events    []*types.SaveAbleEvent
-	lastSaved time.Time
-    FlushInterval time.Duration
-    MaxBufferSize int
+	Dir string
 }
 
-func NewDiskBackup(dir string, flushinterval time.Duration, maxbuffersize int) *DiskBackup {
-	db := &DiskBackup{Dir: dir, lastSaved: time.Now(), FlushInterval: flushinterval, MaxBufferSize: maxbuffersize}
-	go db.PeriodicFlush()
-	return db
-}
-
-func (d *DiskBackup) Save(event *types.Event) error {
-	d.events = append(d.events, event.ConvertToSaveAbleEvent())
-
-	if len(d.events) >= d.MaxBufferSize {
-		return d.flushEventsToFile()
-	}
-
-	return nil
-}
-
-func (d *DiskBackup) PeriodicFlush() {
-	for {
-		time.Sleep(d.FlushInterval)
-
-		if len(d.events) > 0 && time.Since(d.lastSaved) >= d.FlushInterval {
-			d.flushEventsToFile()
-		}
-	}
-}
-
-func (d *DiskBackup) flushEventsToFile() error {
-	data, err := json.Marshal(d.events)
+func (d *DiskBackup) flush(events []*types.SaveAbleEvent) error {
+	data, err := json.Marshal(events)
 	if err != nil {
 		return err
 	}
@@ -57,8 +27,7 @@ func (d *DiskBackup) flushEventsToFile() error {
 	fmt.Println("Saving to", fullPath)
 
 	// Reset the events slice and update lastSaved time
-	d.events = nil
-	d.lastSaved = time.Now()
+	events = nil
 
-	return os.WriteFile(fullPath, data, 0644) 
+	return os.WriteFile(fullPath, data, 0644)
 }
