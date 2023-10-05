@@ -185,8 +185,8 @@ func main() {
 	}
 
 	stressRelief := &collect.StressRelief{Done: done}
-	upstreamTransmission := transmit.NewDefaultTransmission(upstreamClient, upstreamMetricsRecorder, "upstream")
-	peerTransmission := transmit.NewDefaultTransmission(peerClient, peerMetricsRecorder, "peer")
+	upstreamTransmission := transmit.NewDefaultTransmission(c, upstreamClient, upstreamMetricsRecorder, "upstream")
+	peerTransmission := transmit.NewDefaultTransmission(c, peerClient, peerMetricsRecorder, "peer")
 
 	// we need to include all the metrics types so we can inject them in case they're needed
 	// but we only want to instantiate the ones that are enabled with non-null values

@@ -1458,3 +1458,95 @@ groups:
           If this duration is `0`, then Refinery will not start in stressed
           mode, which will provide faster startup at the possible cost of
           startup instability.
+  - name: Backup
+    title: "Bacup Configuration"
+    description: contains backup configuration options.
+    fields:
+      - name: Type
+        type: string
+        valuetype: nondefault
+        default: "none"
+        reload: false
+        summary: which type of backup to use
+        description: >
+          This setting is the type of backup to use. 
+          Valid values are "none", "s3", or "disk"
+          Depending on the type chosen, there may be 
+          extra config options
+      - name: MaxBufferSize
+        type: int
+        valuetype: nondefault
+        default: 10_000
+        reload: true
+        validations:
+          - type: minimum
+            arg: 1000
+        summary: is the number events to keep before saving failed events.
+        description: >
+          This is used to batch events together when saving. The larger this 
+          number, the bigger the backup file sizes will be.  Adjust smaller
+          if your events have a larger than average byte size, adjust bigger 
+          for less backup files.
+      - name: FlushInterval
+        type: duration
+        valuetype: nondefault
+        default: 30s
+        reload: false
+        validations:
+          - type: minimum
+            arg: 1s
+        summary: how often to flush the failed events buffer.
+        description: >
+          This is used for when there are not enough events in the failed buffer
+          to force a write out.  This gaurentees that after some amount of time,
+          no matter the size, the events will be saved.
+  - name: DiskBackup
+    title: "DiskBackup Configuration"
+    description: contains backup configuration options when saving to disk
+    fields:
+      - name: Dir
+        type: string
+        valuetype: nondefault
+        default: "/tmp/refinery-backup"
+        reload: false
+        summary: where to save backup files on disk
+        description: >
+          This is the location of where to save back up files when using
+          the disk backup. 
+  - name: S3Backup
+    title: "S3 Backup Configuration"
+    description: contains backup configuration options when saving to AWS S3
+    fields:
+      - name: Bucket
+        type: string
+        valuetype: nondefault
+        default: "refinery-backup"
+        reload: false
+        summary: which bucket to save files to on S3
+        description: >
+          This saves backup files to the specified bucket.   
+      - name: AWS_ACCESS_KEY_ID
+        type: string
+        valuetype: nondefault
+        default: ""
+        reload: false
+        summary: Amazon AWS_ACCESS_KEY_ID
+        description: >
+          The Amazon AWS_ACCESS_KEY_ID with permissions to put objects
+          on the S3 bucket specified.
+      - name: AWS_SECRET_ACCESS_KEY
+        type: string
+        valuetype: nondefault
+        default: ""
+        reload: false
+        summary: Amazon AWS_SECRET_ACCESS_KEY
+        description: >
+          The Amazon AWS_SECRET_ACCESS_KEY
+      - name: AWS_REGION
+        type: string
+        valuetype: nondefault
+        default: "us-east-1"
+        reload: false
+        summary: which AWS region to save to
+        description: >
+          Which AWS region the back up S3 bucket is located

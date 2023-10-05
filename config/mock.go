@@ -88,6 +88,14 @@ type MockConfig struct {
 	TraceIdFieldNames                []string
 	ParentIdFieldNames               []string
 	CfgMetadata                      []ConfigMetadata
+	BackupType                       string
+	BackupMaxBufferSize              int
+	BackupFlushInterval              time.Duration
+	DiskBackupDir                    string
+	S3BackupBucket                   string
+	S3BackupAWSAceessKeyID           string
+	S3BackupAWSSecreateAccessKey     string
+	S3BackupAWSRegion                string
 
 	Mux sync.RWMutex
 }
@@ -530,4 +538,60 @@ func (f *MockConfig) GetAdditionalAttributes() map[string]string {
 	defer f.Mux.RUnlock()
 
 	return f.AdditionalAttributes
+}
+
+func (f *MockConfig) GetBackupType() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.BackupType
+}
+
+func (f *MockConfig) GetBackupMaxBufferSize() int {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.BackupMaxBufferSize
+}
+
+func (f *MockConfig) GetBackupFlushInterval() time.Duration {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return time.Duration(f.BackupFlushInterval)
+}
+
+func (f *MockConfig) GetBackupDir() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.DiskBackupDir
+}
+
+func (f *MockConfig) GetBackupBucket() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.S3BackupBucket
+}
+
+func (f *MockConfig) GetBackupAWSAccessKeyID() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.S3BackupAWSAceessKeyID
+}
+
+func (f *MockConfig) GetBackupAWSSecretAccessKey() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.S3BackupAWSSecreateAccessKey
+}
+
+func (f *MockConfig) GetBackupAWSRegion() string {
+	f.Mux.RLock()
+	defer f.Mux.RUnlock()
+
+	return f.S3BackupAWSRegion
 }

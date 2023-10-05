@@ -2,7 +2,7 @@
 ## Honeycomb Refinery Configuration ##
 ######################################
 #
-# created {{ now }} from {{ .Input }} using a template generated on 2023-08-02 at 23:32:03 UTC
+# created {{ now }} from {{ .Input }} using a template generated on 2023-09-27 at 17:43:59 UTC
 
 # This file contains a configuration for the Honeycomb Refinery. It is in YAML
 # format, organized into named groups, each of which contains a set of
@@ -1137,6 +1137,96 @@ StressRelief:
     ## default: 3s
     ## Eligible for live reload.
     {{ nonDefaultOnly .Data "MinimumStartupDuration" "StressRelief.MinimumStartupDuration" "3s" }}
+
+#########################
+## Bacup Configuration ##
+#########################
+Backup:
+  ## Backup contains backup configuration options.
+  ####
+    ## Type which type of backup to use
+    ##
+    ## This setting is the type of backup to use.  Valid values are "none",
+    ## "s3", or "disk" Depending on the type chosen, there may be  extra
+    ## config options
+    ##
+    ## default: none
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "Type" "Type" "none" }}
+
+    ## MaxBufferSize is the number events to keep before saving failed
+    ## events.
+    ##
+    ## This is used to batch events together when saving. The larger this
+    ## number, the bigger the backup file sizes will be.  Adjust smaller if
+    ## your events have a larger than average byte size, adjust bigger  for
+    ## less backup files.
+    ##
+    ## default: 10000
+    ## Eligible for live reload.
+    {{ nonDefaultOnly .Data "MaxBufferSize" "MaxBufferSize" 10000 }}
+
+    ## FlushInterval how often to flush the failed events buffer.
+    ##
+    ## This is used for when there are not enough events in the failed buffer
+    ## to force a write out.  This gaurentees that after some amount of time,
+    ## no matter the size, the events will be saved.
+    ##
+    ## Accepts a duration string with units, like "30s".
+    ## default: 30s
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "FlushInterval" "FlushInterval" "30s" }}
+
+##############################
+## DiskBackup Configuration ##
+##############################
+DiskBackup:
+  ## DiskBackup contains backup configuration options when saving to disk
+  ####
+    ## Dir where to save backup files on disk
+    ##
+    ## This is the location of where to save back up files when using the
+    ## disk backup.
+    ##
+    ## default: /tmp/refinery-backup
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "Dir" "Dir" "/tmp/refinery-backup" }}
+
+#############################
+## S3 Backup Configuration ##
+#############################
+S3Backup:
+  ## S3Backup contains backup configuration options when saving to AWS S3
+  ####
+    ## Bucket which bucket to save files to on S3
+    ##
+    ## This saves backup files to the specified bucket.
+    ##
+    ## default: refinery-backup
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "Bucket" "Bucket" "refinery-backup" }}
+
+    ## AWS_ACCESS_KEY_ID Amazon AWS_ACCESS_KEY_ID
+    ##
+    ## The Amazon AWS_ACCESS_KEY_ID with permissions to put objects on the S3
+    ## bucket specified.
+    ##
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "AWS_ACCESS_KEY_ID" "AWS_ACCESS_KEY_ID" "" }}
+
+    ## AWS_SECRET_ACCESS_KEY Amazon AWS_SECRET_ACCESS_KEY
+    ##
+    ## The Amazon AWS_SECRET_ACCESS_KEY
+    ##
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "AWS_SECRET_ACCESS_KEY" "AWS_SECRET_ACCESS_KEY" "" }}
+
+    ## AWS_REGION which AWS region to save to
+    ##
+    ## Which AWS region the back up S3 bucket is located
+    ## default: us-east-1
+    ## Not eligible for live reload.
+    {{ nonDefaultOnly .Data "AWS_REGION" "AWS_REGION" "us-east-1" }}
 
 ###################################################
 ## Config values removed by the config converter ##

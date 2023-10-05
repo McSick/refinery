@@ -184,6 +184,22 @@ type Config interface {
 	GetTraceIdFieldNames() []string
 
 	GetParentIdFieldNames() []string
+
+	GetBackupType() string
+
+	GetBackupMaxBufferSize() int
+
+	GetBackupFlushInterval() time.Duration
+
+	GetBackupDir() string
+
+	GetBackupBucket() string
+
+	GetBackupAWSAccessKeyID() string
+
+	GetBackupAWSSecretAccessKey() string
+
+	GetBackupAWSRegion() string
 }
 
 type ConfigMetadata struct {

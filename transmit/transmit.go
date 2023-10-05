@@ -2,12 +2,14 @@ package transmit
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
+	"github.com/honeycombio/refinery/backup"
 	"github.com/honeycombio/refinery/config"
 	"github.com/honeycombio/refinery/logger"
 	"github.com/honeycombio/refinery/metrics"
@@ -37,6 +39,11 @@ type DefaultTransmission struct {
 	Version    string          `inject:"version"`
 	LibhClient *libhoney.Client
 
+	eventStore     map[int64]*types.Event
+	eventStoreLock sync.Mutex
+
+	Backup backup.Backup
+
 	// Type is peer or upstream, and used only for naming metrics
 	Name string
 
@@ -46,8 +53,8 @@ type DefaultTransmission struct {
 
 var once sync.Once
 
-func NewDefaultTransmission(client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
-	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name}
+func NewDefaultTransmission(c config.Config, client *libhoney.Client, m metrics.Metrics, name string) *DefaultTransmission {
+	return &DefaultTransmission{LibhClient: client, Metrics: m, Name: name, eventStore: make(map[int64]*types.Event), Backup: backup.NewBackup(c)}
 }
 
 func (d *DefaultTransmission) Start() error {
@@ -94,6 +101,12 @@ func (d *DefaultTransmission) reloadTransmissionBuilder() {
 	builder.APIHost = upstreamAPI
 }
 
+// func (d *DefaultTransmission) addToEventStore(ev *types.Event, enqueued_at string) map[string]any {
+// 	d.eventStoreLock.Lock()
+// 	d.eventStore[enqueued_at.(int64)] = ev
+// 	d.eventStoreLock.Unlock()
+// }
+
 func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 	d.Logger.Debug().
 		WithField("request_id", ev.Context.Value(types.RequestIDContextKey{})).
@@ -113,7 +126,9 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 		"environment": ev.Environment,
 		"enqueued_at": time.Now().UnixMicro(),
 	}
-
+	d.eventStoreLock.Lock()
+	d.eventStore[metadata["enqueued_at"].(int64)] = ev
+	d.eventStoreLock.Unlock()
 	for _, k := range d.Config.GetAdditionalErrorFields() {
 		if v, ok := ev.Data[k]; ok {
 			metadata[k] = v
@@ -127,6 +142,7 @@ func (d *DefaultTransmission) EnqueueEvent(ev *types.Event) {
 
 	err := libhEv.SendPresampled()
 	if err != nil {
+		d.Backup.Save(ev) // FIXME Why is there multiple failure spots?
 		d.Metrics.Increment(counterEnqueueErrors)
 		d.Logger.Error().
 			WithString("error", err.Error()).
@@ -175,6 +191,14 @@ func (d *DefaultTransmission) processResponses(
 					enqueuedAt = metadata["enqueued_at"].(int64)
 					dequeuedAt = time.Now().UnixMicro()
 				}
+
+				if event, exists := d.eventStore[enqueuedAt]; exists {
+					saveerror := d.Backup.Save(event)
+					if saveerror != nil {
+						fmt.Println(saveerror)
+					} // FIXME this is just for testing, remove it later
+				}
+
 				log := d.Logger.Error().WithFields(map[string]interface{}{
 					"status_code":    r.StatusCode,
 					"api_host":       apiHost,
@@ -197,6 +221,9 @@ func (d *DefaultTransmission) processResponses(
 					enqueuedAt = metadata["enqueued_at"].(int64)
 					dequeuedAt = time.Now().UnixMicro()
 				}
+				d.eventStoreLock.Lock()
+				delete(d.eventStore, enqueuedAt)
+				d.eventStoreLock.Unlock()
 				d.Metrics.Increment(counterResponse20x)
 			}
 			d.Metrics.Down(updownQueuedItems)

@@ -731,6 +731,82 @@ func TestHoneycombIdFieldsConfigDefault(t *testing.T) {
 	assert.Equal(t, []string{"trace.parent_id", "parentId"}, c.GetParentIdFieldNames())
 }
 
+func TestBackupDefaults(t *testing.T) {
+	cm := makeYAML("General.ConfigurationVersion", 2)
+	rm := makeYAML("ConfigVersion", 2)
+	config, rules := createTempConfigs(t, cm, rm)
+	defer os.Remove(rules)
+	defer os.Remove(config)
+	c, err := getConfig([]string{"--no-validate", "--config", config, "--rules_config", rules})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "none", c.GetBackupType())
+	assert.Equal(t, 10_000, c.GetBackupMaxBufferSize())
+	assert.Equal(t, time.Duration(30*time.Second), c.GetBackupFlushInterval())
+	assert.Equal(t, "/tmp/refinery-backup", c.GetBackupDir())
+	assert.Equal(t, "refinery-backup", c.GetBackupBucket())
+	assert.Equal(t, "", c.GetBackupAWSAccessKeyID())
+	assert.Equal(t, "", c.GetBackupAWSSecretAccessKey())
+	assert.Equal(t, "us-east-1", c.GetBackupAWSRegion())
+}
+
+func TestBackupConfig(t *testing.T) {
+	cm := makeYAML("General.ConfigurationVersion", 2,
+		"Backup.Type", "disk",
+		"Backup.MaxBufferSize", 20_000,
+		"Backup.FlushInterval", "5s",
+	)
+
+	rm := makeYAML("ConfigVersion", 2)
+	config, rules := createTempConfigs(t, cm, rm)
+	defer os.Remove(rules)
+	defer os.Remove(config)
+	c, err := getConfig([]string{"--no-validate", "--config", config, "--rules_config", rules})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "disk", c.GetBackupType())
+	assert.Equal(t, 20_000, c.GetBackupMaxBufferSize())
+	assert.Equal(t, time.Duration(5*time.Second), c.GetBackupFlushInterval())
+}
+
+func TestDiskBackupConfig(t *testing.T) {
+	cm := makeYAML("General.ConfigurationVersion", 2,
+		"Backup.Type", "disk",
+		"DiskBackup.Dir", "/test/folder",
+	)
+
+	rm := makeYAML("ConfigVersion", 2)
+	config, rules := createTempConfigs(t, cm, rm)
+	defer os.Remove(rules)
+	defer os.Remove(config)
+	c, err := getConfig([]string{"--no-validate", "--config", config, "--rules_config", rules})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "disk", c.GetBackupType())
+	assert.Equal(t, "/test/folder", c.GetBackupDir())
+}
+
+func TestS3BackupConfig(t *testing.T) {
+	cm := makeYAML("General.ConfigurationVersion", 2,
+		"Backup.Type", "s3",
+		"S3Backup.Bucket", "test-bucket",
+		"S3Backup.AWS_ACCESS_KEY_ID", "123",
+		"S3Backup.AWS_SECRET_ACCESS_KEY", "abc",
+		"S3Backup.AWS_REGION", "us-west-1",
+	)
+	rm := makeYAML("ConfigVersion", 2)
+	config, rules := createTempConfigs(t, cm, rm)
+	defer os.Remove(rules)
+	defer os.Remove(config)
+	c, err := getConfig([]string{"--no-validate", "--config", config, "--rules_config", rules})
+	assert.NoError(t, err)
+	assert.Equal(t, "s3", c.GetBackupType())
+	assert.Equal(t, "test-bucket", c.GetBackupBucket())
+	assert.Equal(t, "123", c.GetBackupAWSAccessKeyID())
+	assert.Equal(t, "abc", c.GetBackupAWSSecretAccessKey())
+	assert.Equal(t, "us-west-1", c.GetBackupAWSRegion())
+}
+
 func TestMemorySizeUnmarshal(t *testing.T) {
 	tests := []struct {
 		name     string
